@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Linq;
 using System.Windows.Forms;
 
 namespace Calculator
@@ -9,6 +8,7 @@ namespace Calculator
         #region Constants
 
         private const string Numbers = "0123456789";
+        private const string ListOfOperations = "+-*/";
 
         #endregion
 
@@ -33,34 +33,57 @@ namespace Calculator
             //this.Load += Form1_Load;
         }
 
-
         private void Form1_KeyPress(object sender, KeyPressEventArgs e)
         {
-            char keyChar = e.KeyChar;
+            string keyPressed = e.KeyChar.ToString();
 
-            if (Numbers.Contains(keyChar))
+            //MessageBox.Show("you have pressed " + keyPressed);
+
+            //number pressed
+            if (Numbers.Contains(keyPressed))
             {
-                HandleNumberInsert(keyChar.ToString());
+                HandleNumberInsert(keyPressed);
             }
 
+            //operation pressed
+            if (ListOfOperations.Contains(keyPressed))
+            {
+                HandleOperationInsert(keyPressed);
+            }
 
-            //TODO: handle for operations and equals
+            // equals pressed or ENTER
+            if (keyPressed == "=" || e.KeyChar == (char)Keys.Enter)
+            {
+                _equalsClicked = true;
+                preCalculateLabel.Text = "";
+
+                result.Text = PerformOperation(_currentOperation).ToString();
+
+                _operationClicked = false;
+            }
+
+            //decimal pressed
+            if (keyPressed == ".")
+            {
+                HandleDecimal();
+            }
+
+            //escape pressed
+            if (e.KeyChar == (char)Keys.Escape)
+            {
+                ClearAll();
+            }
+
+            //backspace pressed
+            if (e.KeyChar == (char)Keys.Back)
+            {
+                EraseLastDigit();
+            }
         }
 
-        private void Number_Click(object sender, EventArgs e)
-        {
-            Button b = (Button)sender;
-
-            //eliminate the front 0 and introduce new numbers
-            HandleNumberInsert(b.Text);
-        }
-
-        /// <summary>
-        /// Allows to insert numbers from keyboard and click on buttons
-        /// </summary>
         private void HandleNumberInsert(string text)
         {
-            if (result.Text == "0" || _operationClicked)
+            if (result.Text == "0" || _operationClicked || _equalsClicked)
             {
                 result.Text = text;
             }
@@ -71,8 +94,77 @@ namespace Calculator
 
             _operationClicked = false;
             _decimalClicked = false;
+            _equalsClicked = false;
+        }
+        private void HandleOperationInsert(string operation)
+        {
+            _currentOperation = operation;
+            //first operation added to the label or after pressing =
+            if (string.IsNullOrEmpty(preCalculateLabel.Text) || _equalsClicked)
+            {
+                preCalculateLabel.Text = $"{result.Text} {operation}";
+                _value = double.Parse(result.Text);
+                result.Text = "0";
+            }
+            // if operation mistake, change label
+            else if (_operationClicked)
+            {
+                preCalculateLabel.Text = preCalculateLabel.Text.Substring(0, preCalculateLabel.Text.Length - 1) + operation;
+            }
+            //update label
+            else
+            {
+                preCalculateLabel.Text = preCalculateLabel.Text + " " + result.Text + " " + operation;
+                if (!_equalsClicked || _decimalClicked)
+                {
+                    //when operation clicked, update the result with the operation before
+                    _value = PerformOperation(_lastOperation);
+                }
+            }
+            _equalsClicked = false;
+            result.Text = _value.ToString();
+            _operationClicked = true;
+            _lastOperation = _currentOperation;
+        }
+        private void HandleDecimal()
+        {
+            if (int.TryParse(result.Text, out int number))
+            {
+                result.Text = result.Text + ".";
+            }
+
+            if (_operationClicked || _equalsClicked)
+            {
+                result.Text = "0" + ".";
+            }
+
+            _decimalClicked = true;
+            _operationClicked = false;
+            _equalsClicked = false;
+        }
+        private void ClearAll()
+        {
+            result.Text = "0";
+            preCalculateLabel.Text = string.Empty;
+            _value = 0;
+            _lastOperation = string.Empty;
+            _currentOperation = string.Empty;
+        }
+        private void EraseLastDigit()
+        {
+            result.Text = result.Text.Substring(0, result.Text.Length - 1);
         }
 
+        private void Number_Click(object sender, EventArgs e)
+        {
+            Button b = (Button)sender;
+
+            //eliminate the front 0 and introduce new numbers
+            HandleNumberInsert(b.Text);
+        }
+        /// <summary>
+        /// Allows to insert numbers from keyboard and click on buttons
+        /// </summary>
         private double PerformOperation(string operation)
         {
             double calculationResult = 0;
@@ -103,40 +195,15 @@ namespace Calculator
             }
             return calculationResult;
         }
+        /// <summary>
+        /// Allows to insert operations from the keyboard and click on them through the interface    
+        /// </summary>
         private void Operation_Click(object sender, EventArgs e)
         {
-            _lastOperation = _currentOperation;
-
             Button b = (Button)sender;
             _currentOperation = b.Text;
 
-            //first operation added to the label or after pressing =
-            if (string.IsNullOrEmpty(preCalculateLabel.Text) || _equalsClicked)
-            {
-                preCalculateLabel.Text = $"{result.Text} {_currentOperation}";
-                _value = double.Parse(result.Text);
-                result.Text = "0";
-            }
-            // if operation mistake, change label
-            else if (_operationClicked)
-            {
-                preCalculateLabel.Text = preCalculateLabel.Text.Substring(0, preCalculateLabel.Text.Length - 1) + _currentOperation;
-            }
-            //update label
-            else
-            {
-                preCalculateLabel.Text = preCalculateLabel.Text + " " + result.Text + " " + _currentOperation;
-                if (!_equalsClicked || _decimalClicked)
-                {
-                    //when operation clicked, update the result with the operation before
-                    _value = PerformOperation(_lastOperation);
-                }
-            }
-
-            _equalsClicked = false;
-            result.Text = _value.ToString();
-            _operationClicked = true;
-
+            HandleOperationInsert(_currentOperation);
         }
         private void Equals_Click(object sender, EventArgs e)
         {
@@ -149,21 +216,7 @@ namespace Calculator
         }
         private void ButtonDecimal_Click(object sender, EventArgs e)
         {
-            Button b = (Button)sender;
-
-            if (int.TryParse(result.Text, out int number))
-            {
-                result.Text = result.Text + b.Text;
-            }
-
-            if (_operationClicked || _equalsClicked)
-            {
-                result.Text = "0" + b.Text;
-            }
-
-            _decimalClicked = true;
-            _operationClicked = false;
-            _equalsClicked = false;
+            HandleDecimal();
         }
         private void ButtonNegative_Click(object sender, EventArgs e)
         {
@@ -171,11 +224,7 @@ namespace Calculator
         }
         private void Clear_Click(object sender, EventArgs e)
         {
-            result.Text = "0";
-            preCalculateLabel.Text = string.Empty;
-            _value = 0;
-            _lastOperation = string.Empty;
-            _currentOperation = string.Empty;
+            ClearAll();
         }
         private void ClearEntry_Click(object sender, EventArgs e)
         {
@@ -183,37 +232,48 @@ namespace Calculator
         }
         private void Delete_Click(object sender, EventArgs e)
         {
-            if (int.TryParse(result.Text, out int number))
-            {
-                result.Text = (number / 10).ToString();
-            }
-            else
-            {
-                result.Text = result.Text.Substring(0, result.Text.Length - 1);
-            }
-
+            EraseLastDigit();
         }
 
         #region Tests
 
         private void Form1_Load(object sender, EventArgs e)
         {
-            TestForMinus();
+            TestForNumberInsertion();
+            TestForOperationInsertion();
+            TestForDecimalPoint();
+            TestForEqualsInsertion();
+            TestForClearAll();
+            TestForEraseLastDigit();
         }
-
-        private void TestForMinus()
+        private void TestForEraseLastDigit()
         {
-            this.button7.PerformClick();
-            this.Substract.PerformClick();
+            throw new NotImplementedException();
+        }
+        private void TestForClearAll()
+        {
+            throw new NotImplementedException();
+        }
+        private void TestForEqualsInsertion()
+        {
+            throw new NotImplementedException();
+        }
+        private void TestForDecimalPoint()
+        {
+            throw new NotImplementedException();
+        }
+        private void TestForOperationInsertion()
+        {
+            throw new NotImplementedException();
+        }
+        private void TestForNumberInsertion()
+        {
+            //initial insertion
+            //double digit = this.button7.Click;
 
-            if (preCalculateLabel.Text != "7 -")
-            {
-                throw new Exception("nu e bine la ceva");
-            }
+            //inserting multidigit numbers
         }
 
         #endregion Tests
-
-
     }
 }
